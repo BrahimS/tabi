@@ -1,11 +1,19 @@
-import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
+// Storage backend:
+//   local dev  → node:sqlite at data/japan.db (zero-config)
+//   Vercel     → libsql embedded replica, auto-synced to Turso when
+//                TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN) are set
+// Overrides: TABI_DB_DIR / TABI_DB_PATH (tests, custom deploys).
 
 const DB_DIR = process.env.TABI_DB_DIR ?? path.join(process.cwd(), 'data');
 const DB_PATH = process.env.TABI_DB_PATH ?? path.join(DB_DIR, 'japan.db');
+const TURSO_URL = process.env.TURSO_DATABASE_URL;
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
-let db: DatabaseSync | null = null;
+let db: Db | null = null;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS profile (
@@ -74,15 +82,133 @@ CREATE INDEX IF NOT EXISTS idx_vocab_due ON vocab_state(due_date);
 CREATE INDEX IF NOT EXISTS idx_attempts_created ON quiz_attempts(created_at);
 `;
 
-export function getDb(): DatabaseSync {
+// Minimal shared surface — every caller only uses prepare().run/get/all + exec.
+type Param = null | number | bigint | string | Uint8Array;
+
+export interface DbStatement {
+  run(...params: Param[]): unknown;
+  get(...params: Param[]): unknown;
+  all(...params: Param[]): unknown[];
+}
+
+export interface Db {
+  prepare(sql: string): DbStatement;
+  exec(sql: string): void;
+}
+
+// ---------- node:sqlite backend ----------
+
+function nodeBackend(): Db {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  const raw = new DatabaseSync(DB_PATH);
+  raw.exec('PRAGMA journal_mode = WAL;');
+  raw.exec('PRAGMA busy_timeout = 5000;');
+  return raw;
+}
+
+// ---------- libsql (Turso embedded replica) backend ----------
+
+interface LibsqlStatement {
+  run(...params: Param[]): unknown;
+  get(...params: Param[]): unknown;
+  all(...params: Param[]): unknown[];
+}
+interface LibsqlDb {
+  prepare(sql: string): LibsqlStatement;
+  exec(sql: string): void;
+  sync(): Promise<unknown>;
+  close(): void;
+}
+
+// libsql rows carry a `_metadata` field — strip it so row objects stay clean.
+function stripMeta<T>(row: T): T {
+  if (row && typeof row === 'object' && '_metadata' in row) {
+    const copy = { ...(row as Record<string, unknown>) };
+    delete copy._metadata;
+    return copy as T;
+  }
+  return row;
+}
+
+function libsqlBackend(): Db {
+  // Loaded lazily so local dev never pays for the native binding.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Database } = require('libsql') as {
+    Database: new (
+      p: string,
+      o: {
+        syncUrl: string;
+        authToken?: string;
+        syncInterval?: number;
+        offline?: boolean;
+      },
+    ) => LibsqlDb;
+  };
+  fs.mkdirSync(DB_DIR, { recursive: true });
+  const raw = new Database(path.join(DB_DIR, 'tabi-replica.db'), {
+    syncUrl: TURSO_URL!,
+    authToken: TURSO_TOKEN,
+    syncInterval: 60, // pull remote changes once a minute
+    // write locally first, batch-push on sync — without this every write
+    // round-trips to Turso synchronously (slow + hard-fails offline)
+    offline: true,
+  });
+
+  // Push local writes to Turso shortly after the last one lands.
+  let dirty = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const scheduleSync = () => {
+    dirty = true;
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      if (!dirty) return;
+      dirty = false;
+      raw.sync().catch((e: unknown) => console.error('[tabi] Turso sync failed:', e));
+    }, 2000);
+    timer.unref?.();
+  };
+
+  return {
+    prepare(sql: string): DbStatement {
+      const st = raw.prepare(sql);
+      return {
+        run: (...p: Param[]) => {
+          scheduleSync();
+          return st.run(...p);
+        },
+        get: (...p: Param[]) => stripMeta(st.get(...p)),
+        all: (...p: Param[]) => (st.all(...p) as unknown[]).map(stripMeta),
+      };
+    },
+    exec(sql: string) {
+      scheduleSync();
+      raw.exec(sql);
+    },
+  };
+}
+
+// ---------- entry point ----------
+
+export function getDb(): Db {
   if (typeof window !== 'undefined') {
     throw new Error('SQLite is server-only');
   }
   if (!db) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
-    db = new DatabaseSync(DB_PATH);
-    db.exec('PRAGMA journal_mode = WAL;');
-    db.exec('PRAGMA busy_timeout = 5000;');
+    if (TURSO_URL) {
+      try {
+        db = libsqlBackend();
+      } catch (e) {
+        console.error(
+          '[tabi] TURSO_DATABASE_URL is set but the replica could not open — ' +
+            'falling back to local node:sqlite (data will NOT persist on serverless).',
+          e,
+        );
+        db = nodeBackend();
+      }
+    } else {
+      db = nodeBackend();
+    }
     db.exec(SCHEMA);
     ensureProfile(db);
     ensureUserState(db);
@@ -90,7 +216,7 @@ export function getDb(): DatabaseSync {
   return db;
 }
 
-function ensureProfile(db: DatabaseSync) {
+function ensureProfile(db: Db) {
   const row = db.prepare('SELECT id FROM profile WHERE id = 1').get();
   if (!row) {
     db.prepare(
@@ -101,6 +227,6 @@ function ensureProfile(db: DatabaseSync) {
   }
 }
 
-function ensureUserState(db: DatabaseSync) {
+function ensureUserState(db: Db) {
   db.prepare('INSERT OR IGNORE INTO user_state (id) VALUES (1)').run();
 }

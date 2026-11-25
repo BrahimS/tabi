@@ -1,35 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tabi — Japanese for travel
 
-## Getting Started
+A Next.js app for learning Japanese, built for a complete beginner traveling to Japan.
+Lessons, quizzes, spaced-repetition review, a pressure-sensitive writing pad with
+stroke-order guides, speech practice, scenario dialogues, trip mode, stats, and a
+curated video library — all persisted in SQLite.
 
-First, run the development server:
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
+npm test         # vitest
+npm run build    # production build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Progress is stored in `data/japan.db` (created on first run, gitignored).
+Override with `TABI_DB_DIR` / `TABI_DB_PATH` if needed.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy to Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The local SQLite **file will not persist** on Vercel (serverless filesystem is
+ephemeral). Tabi supports **Turso** (managed libsql) via an embedded replica:
 
-## Learn More
+1. Create a Turso database:
+   ```bash
+   brew install tursodatabase/tap/turso   # or curl -sSfL https://get.tur.so/install.sh | bash
+   turso auth signup && turso auth login
+   turso db create tabi
+   turso db show tabi --url             # libsql://tabi-xxx.turso.io
+   turso db tokens create tabi          # auth token
+   ```
+2. In Vercel → Project → Settings → Environment Variables, add:
+   - `TURSO_DATABASE_URL` = `libsql://tabi-xxx.turso.io`
+   - `TURSO_AUTH_TOKEN` = the token
+3. Import the repo on vercel.com → Framework: Next.js → Deploy. No other config needed.
 
-To learn more about Next.js, take a look at the following resources:
+How it works: `src/lib/db.ts` opens a **libsql embedded replica** (a local file that
+syncs to Turso) when `TURSO_DATABASE_URL` is set; otherwise it uses `node:sqlite`
+unchanged. Writes are local-first (`offline` mode) and batch-pushed ~2s after the
+last write; remote changes pull in every 60s. If the Turso replica can't open at
+boot, the app logs loudly and falls back to local SQLite so the site stays up.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> One instance per user: embedded replicas converge via Turso, but concurrent
+> writes from two instances at once are last-writer-wins per row.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Backup
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Profile page → "Backup & restore" exports/imports all progress as JSON —
+useful before switching storage backends.
