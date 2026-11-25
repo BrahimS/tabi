@@ -633,6 +633,126 @@ export function getTripDeck(scenario: TripScenario): TripItem[] {
   return out;
 }
 
+// ---------- backup / restore ----------
+
+const BACKUP_TABLES: Record<string, string[]> = {
+  lesson_progress: [
+    'lesson_id', 'status', 'best_accuracy', 'attempts', 'xp_earned', 'completed_at', 'updated_at',
+  ],
+  vocab_state: [
+    'vocab_key', 'lesson_id', 'status', 'ease', 'interval_days', 'due_date',
+    'reps', 'lapses', 'last_reviewed', 'updated_at',
+  ],
+  quiz_attempts: ['id', 'lesson_id', 'correct', 'total', 'xp_earned', 'created_at'],
+  writing_practice: ['glyph', 'count', 'correct', 'last_practiced'],
+  dialogue_progress: ['scene_id', 'completions', 'best_xp', 'last_played'],
+};
+
+const PROFILE_COLS = ['display_name', 'level', 'goal', 'motivation'];
+const USER_STATE_COLS = ['xp', 'streak', 'last_active_date'];
+
+export interface ProgressBackup {
+  format: 'tabi-backup';
+  version: 1;
+  exportedAt: string;
+  profile: Record<string, unknown>;
+  user_state: Record<string, unknown>;
+  tables: Record<string, Record<string, unknown>[]>;
+}
+
+export function exportProgress(): ProgressBackup {
+  const db = getDb();
+  const tables: Record<string, Record<string, unknown>[]> = {};
+  for (const [table, cols] of Object.entries(BACKUP_TABLES)) {
+    const rows = db.prepare(`SELECT ${cols.join(', ')} FROM ${table}`).all() as Record<
+      string,
+      unknown
+    >[];
+    tables[table] = rows;
+  }
+  const profile =
+    (db
+      .prepare(`SELECT ${PROFILE_COLS.join(', ')} FROM profile WHERE id = 1`)
+      .get() as Record<string, unknown>) ?? {};
+  const user_state =
+    (db
+      .prepare(`SELECT ${USER_STATE_COLS.join(', ')} FROM user_state WHERE id = 1`)
+      .get() as Record<string, unknown>) ?? {};
+  return {
+    format: 'tabi-backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    profile,
+    user_state,
+    tables,
+  };
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** Validate and restore a backup. Wipes current progress — callers confirm first. */
+export function importProgress(raw: unknown): { ok: boolean; error?: string } {
+  if (!isRecord(raw)) return { ok: false, error: 'Not a JSON object' };
+  if (raw.format !== 'tabi-backup') return { ok: false, error: 'Not a Tabi backup file' };
+  if (raw.version !== 1) return { ok: false, error: `Unsupported backup version` };
+  if (!isRecord(raw.tables)) return { ok: false, error: 'Missing table data' };
+
+  // Validate before touching the DB.
+  for (const [table, cols] of Object.entries(BACKUP_TABLES)) {
+    const rows = raw.tables[table];
+    if (rows === undefined) continue; // missing table = skip it
+    if (!Array.isArray(rows)) return { ok: false, error: `Table ${table} is not an array` };
+    for (const row of rows) {
+      if (!isRecord(row)) return { ok: false, error: `Bad row in ${table}` };
+      const bad = Object.keys(row).find((k) => !cols.includes(k));
+      if (bad) return { ok: false, error: `Unknown column ${bad} in ${table}` };
+    }
+  }
+  if (raw.profile !== undefined && !isRecord(raw.profile)) {
+    return { ok: false, error: 'Bad profile data' };
+  }
+  if (raw.user_state !== undefined && !isRecord(raw.user_state)) {
+    return { ok: false, error: 'Bad user_state data' };
+  }
+
+  const db = getDb();
+  db.exec('BEGIN');
+  try {
+    for (const [table, cols] of Object.entries(BACKUP_TABLES)) {
+      const rows = (raw.tables as Record<string, unknown>)[table] as
+        | Record<string, unknown>[]
+        | undefined;
+      db.prepare(`DELETE FROM ${table}`).run();
+      if (!rows) continue;
+      const insert = db.prepare(
+        `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+      );
+      for (const row of rows) {
+        insert.run(...cols.map((c) => (row[c] === undefined ? null : (row[c] as never))));
+      }
+    }
+    const profile = raw.profile as Record<string, unknown>;
+    for (const c of PROFILE_COLS) {
+      if (profile[c] !== undefined) {
+        db.prepare(`UPDATE profile SET ${c} = ? WHERE id = 1`).run(profile[c] as string);
+      }
+    }
+    const us = raw.user_state as Record<string, unknown>;
+    for (const c of USER_STATE_COLS) {
+      if (us[c] !== undefined) {
+        db.prepare(`UPDATE user_state SET ${c} = ? WHERE id = 1`).run(us[c] as never);
+      }
+    }
+    db.exec('COMMIT');
+    return { ok: true };
+  } catch (e) {
+    db.exec('ROLLBACK');
+    return { ok: false, error: e instanceof Error ? e.message : 'Import failed' };
+  }
+}
+
 export { UNITS, LESSONS, UNIT_INDEX, LESSON_INDEX, lessonXp };
 export { TRIP_SCENARIOS } from './trip';
 export type { TripItem, TripScenario } from './trip';

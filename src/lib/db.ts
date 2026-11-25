@@ -2,8 +2,8 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DB_DIR = path.join(process.cwd(), 'data');
-const DB_PATH = path.join(DB_DIR, 'japan.db');
+const DB_DIR = process.env.TABI_DB_DIR ?? path.join(process.cwd(), 'data');
+const DB_PATH = process.env.TABI_DB_PATH ?? path.join(DB_DIR, 'japan.db');
 
 let db: DatabaseSync | null = null;
 
