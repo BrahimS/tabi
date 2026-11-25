@@ -186,3 +186,12 @@ export function IconChart(p: P) {
     </svg>
   );
 }
+
+export function IconChat(p: P) {
+  return (
+    <svg {...base(p)}>
+      <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
+      <path d="M8.5 11h.01m3.5 0h.01m3.5 0h.01" />
+    </svg>
+  );
+}

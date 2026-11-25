@@ -63,6 +63,13 @@ CREATE TABLE IF NOT EXISTS writing_practice (
   last_practiced TEXT
 );
 
+CREATE TABLE IF NOT EXISTS dialogue_progress (
+  scene_id TEXT PRIMARY KEY,
+  completions INTEGER NOT NULL DEFAULT 0,
+  best_xp INTEGER NOT NULL DEFAULT 0,
+  last_played TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_vocab_due ON vocab_state(due_date);
 CREATE INDEX IF NOT EXISTS idx_attempts_created ON quiz_attempts(created_at);
 `;

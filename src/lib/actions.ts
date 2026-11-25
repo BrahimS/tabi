@@ -11,6 +11,7 @@ import {
   getTripDeck,
 } from './data';
 import type { TripScenario, TripItem } from './trip';
+import { DIALOGUE_INDEX } from './dialogues';
 import { LESSON_INDEX, VOCAB_INDEX, vocabKey, lessonXp } from './content';
 import type { Grade } from './data';
 
@@ -274,4 +275,28 @@ function extractCandidates(data: unknown): string[] {
 
 export async function fetchTripDeck(scenario: TripScenario): Promise<TripItem[]> {
   return getTripDeck(scenario);
+}
+
+/** Award XP for finishing a dialogue scene; wrong picks cost 2 XP each (floor 3). */
+export async function completeDialogue(
+  sceneId: string,
+  mistakes: number,
+): Promise<ActionResult & { xp?: number }> {
+  const scene = DIALOGUE_INDEX.get(sceneId);
+  if (!scene) return { ok: false, error: 'Unknown scene' };
+
+  const xp = Math.max(3, scene.xp - Math.max(0, mistakes) * 2);
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO dialogue_progress (scene_id, completions, best_xp, last_played)
+     VALUES (?, 1, ?, datetime('now'))
+     ON CONFLICT(scene_id) DO UPDATE SET
+       completions = completions + 1,
+       best_xp = MAX(best_xp, excluded.best_xp),
+       last_played = datetime('now')`,
+  ).run(sceneId, xp);
+
+  touchActivity();
+  addXp(xp);
+  return { ok: true, xp };
 }
