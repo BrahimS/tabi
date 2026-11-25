@@ -1,4 +1,6 @@
 import { getDb } from './db';
+import { TRIP_SCENARIOS } from './trip';
+import type { TripItem, TripScenario } from './trip';
 import {
   LESSONS,
   UNITS,
@@ -584,5 +586,36 @@ export function getStats(): Stats {
   };
 }
 
+// ---------- trip mode ----------
+
+export function getTripDeck(scenario: TripScenario): TripItem[] {
+  const meta = TRIP_SCENARIOS.find((s) => s.id === scenario);
+  if (!meta) return [];
+  const db = getDb();
+  const learned = new Set(
+    (db.prepare('SELECT vocab_key FROM vocab_state').all() as { vocab_key: string }[]).map(
+      (r) => r.vocab_key,
+    ),
+  );
+  const out: TripItem[] = [];
+  for (const lesson of LESSONS) {
+    if (meta.unitIds && !meta.unitIds.includes(lesson.unitId)) continue;
+    for (const item of lesson.vocab) {
+      if (item.noQuiz) continue;
+      const key = `${lesson.id}:${item.id}`;
+      out.push({
+        key,
+        kana: item.kana,
+        romaji: item.romaji,
+        meaning: item.meaning,
+        learned: learned.has(key),
+      });
+    }
+  }
+  return out;
+}
+
 export { UNITS, LESSONS, UNIT_INDEX, LESSON_INDEX, lessonXp };
+export { TRIP_SCENARIOS } from './trip';
+export type { TripItem, TripScenario } from './trip';
 export type { Lesson, Unit, VocabItem };
