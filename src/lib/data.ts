@@ -586,6 +586,24 @@ export function getStats(): Stats {
   };
 }
 
+// ---------- dialogues ----------
+
+export interface DialogueState {
+  sceneId: string;
+  completions: number;
+  bestXp: number;
+}
+
+export function getDialogueStates(): Map<string, DialogueState> {
+  const db = getDb();
+  const rows = db
+    .prepare('SELECT scene_id, completions, best_xp FROM dialogue_progress')
+    .all() as { scene_id: string; completions: number; best_xp: number }[];
+  return new Map(
+    rows.map((r) => [r.scene_id, { sceneId: r.scene_id, completions: r.completions, bestXp: r.best_xp }]),
+  );
+}
+
 // ---------- trip mode ----------
 
 export function getTripDeck(scenario: TripScenario): TripItem[] {
