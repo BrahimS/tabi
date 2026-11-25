@@ -1,5 +1,6 @@
 import { getDashboardData, getProfile } from '@/lib/data';
 import { ProfileForm } from '@/components/ProfileForm';
+import { BackupPanel } from '@/components/BackupPanel';
 import { IconStar, IconTarget, IconBook, IconZap } from '@/components/icons';
 
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,8 @@ export default function ProfilePage() {
           motivation: profile.motivation,
         }}
       />
+
+      <BackupPanel />
     </div>
   );
 }

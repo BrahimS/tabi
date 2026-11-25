@@ -9,6 +9,8 @@ import {
   addXp,
   todayStr,
   getTripDeck,
+  exportProgress,
+  importProgress,
 } from './data';
 import type { TripScenario, TripItem } from './trip';
 import { DIALOGUE_INDEX } from './dialogues';
@@ -299,4 +301,22 @@ export async function completeDialogue(
   touchActivity();
   addXp(xp);
   return { ok: true, xp };
+}
+
+/** Serialize all progress to a JSON backup string. */
+export async function exportBackup(): Promise<string> {
+  return JSON.stringify(exportProgress(), null, 2);
+}
+
+/** Restore progress from a backup JSON string. Validates before touching the DB. */
+export async function importBackup(json: string): Promise<ActionResult> {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return { ok: false, error: 'That file is not valid JSON' };
+  }
+  const res = importProgress(raw);
+  if (res.ok) touchActivity();
+  return res;
 }
