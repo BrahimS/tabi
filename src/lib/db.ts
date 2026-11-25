@@ -4,11 +4,15 @@ import { DatabaseSync } from 'node:sqlite';
 
 // Storage backend:
 //   local dev  → node:sqlite at data/japan.db (zero-config)
+//   Railway    → node:sqlite on the mounted Volume (RAILWAY_VOLUME_MOUNT_PATH)
 //   Vercel     → libsql embedded replica, auto-synced to Turso when
 //                TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN) are set
 // Overrides: TABI_DB_DIR / TABI_DB_PATH (tests, custom deploys).
 
-const DB_DIR = process.env.TABI_DB_DIR ?? path.join(process.cwd(), 'data');
+const DB_DIR =
+  process.env.TABI_DB_DIR ??
+  process.env.RAILWAY_VOLUME_MOUNT_PATH ??
+  path.join(process.cwd(), 'data');
 const DB_PATH = process.env.TABI_DB_PATH ?? path.join(DB_DIR, 'japan.db');
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
