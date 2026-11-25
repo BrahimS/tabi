@@ -8,7 +8,9 @@ import {
   touchActivity,
   addXp,
   todayStr,
+  getTripDeck,
 } from './data';
+import type { TripScenario, TripItem } from './trip';
 import { LESSON_INDEX, VOCAB_INDEX, vocabKey, lessonXp } from './content';
 import type { Grade } from './data';
 
@@ -268,4 +270,8 @@ function extractCandidates(data: unknown): string[] {
   };
   walk(data);
   return best.slice(0, 8);
+}
+
+export async function fetchTripDeck(scenario: TripScenario): Promise<TripItem[]> {
+  return getTripDeck(scenario);
 }
