@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { logWritingPractice, recognizeInk } from '@/lib/actions';
 import { SpeakButton } from './SpeakButton';
+import { StrokeGuide } from './StrokeGuide';
+import { STROKE_PATHS } from '@/lib/strokes';
 import { IconArrowRight, IconCheck, IconRefresh, IconStar } from './icons';
 import type { WritingDeck, WritingItem } from '@/lib/data';
 
@@ -47,6 +49,8 @@ export function WritingPad({ deck }: { deck: WritingDeck }) {
   const [strokeCount, setStrokeCount] = useState(0);
   const [brushIdx, setBrushIdx] = useState(3);
   const [showGuide, setShowGuide] = useState(true);
+  const [showStrokes, setShowStrokes] = useState(true);
+  const [strokeReplay, setStrokeReplay] = useState(0);
   const [checking, setChecking] = useState(false);
   const [candidates, setCandidates] = useState<string[] | null>(null);
   const [recoError, setRecoError] = useState<string | null>(null);
@@ -255,6 +259,7 @@ export function WritingPad({ deck }: { deck: WritingDeck }) {
   const glyphLen = [...item.glyph].length;
   const ghostSize = Math.min(170, Math.round(300 / Math.max(1.4, glyphLen * 0.9)));
   const recognized = candidates !== null && candidates.includes(item.glyph);
+  const hasStrokes = item.glyph in STROKE_PATHS;
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
@@ -290,6 +295,8 @@ export function WritingPad({ deck }: { deck: WritingDeck }) {
               </text>
             </svg>
           )}
+          {/* stroke-order guide */}
+          {showStrokes && hasStrokes && <StrokeGuide key={strokeReplay} glyph={item.glyph} />}
           {/* ink layer */}
           <canvas
             ref={canvasRef}
@@ -352,6 +359,27 @@ export function WritingPad({ deck }: { deck: WritingDeck }) {
           >
             Guide: {showGuide ? 'on' : 'off'}
           </button>
+          {hasStrokes && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowStrokes((s) => !s)}
+                className="btn-ghost"
+                aria-pressed={showStrokes}
+              >
+                Strokes: {showStrokes ? 'on' : 'off'}
+              </button>
+              {showStrokes && (
+                <button
+                  type="button"
+                  onClick={() => setStrokeReplay((n) => n + 1)}
+                  className="btn-ghost"
+                >
+                  Replay
+                </button>
+              )}
+            </>
+          )}
           <div className="ml-auto">
             <SpeakButton text={item.glyph} iconOnly />
           </div>
