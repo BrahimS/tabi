@@ -408,5 +408,181 @@ export function getWritingDeck(): WritingDeck {
   return { hiragana, katakana, words };
 }
 
+// ---------- stats ----------
+
+export interface DayXp {
+  date: string;
+  xp: number;
+}
+
+export interface UnitStat {
+  unitId: string;
+  title: string;
+  lessonsDone: number;
+  lessonsTotal: number;
+  vocabInDeck: number;
+  vocabMastered: number;
+  vocabTotal: number;
+  bestAvgAccuracy: number;
+}
+
+export interface WeakWord {
+  key: string;
+  kana: string;
+  romaji: string;
+  meaning: string;
+  lapses: number;
+  ease: number;
+  lessonTitle: string;
+}
+
+export interface Stats {
+  xp: number;
+  streak: number;
+  lessonsCompleted: number;
+  lessonsTotal: number;
+  vocabInDeck: number;
+  vocabMastered: number;
+  vocabTotal: number;
+  dueToday: number;
+  quizAttempts: number;
+  avgAccuracy: number;
+  writingGlyphs: number;
+  writingStrokes: number;
+  xpByDay: DayXp[];
+  units: UnitStat[];
+  weakest: WeakWord[];
+}
+
+export function getStats(): Stats {
+  const db = getDb();
+  const { xp, streak } = getUserState();
+  const states = getPathStates();
+  const progressByLesson = new Map(states.map((s) => [s.lessonId, s]));
+
+  const vocabRows = db
+    .prepare(
+      `SELECT lesson_id, status, ease, reps, lapses, vocab_key FROM vocab_state`,
+    )
+    .all() as {
+    lesson_id: string;
+    status: string;
+    ease: number;
+    reps: number;
+    lapses: number;
+    vocab_key: string;
+  }[];
+
+  const byLesson = new Map<string, { deck: number; mastered: number }>();
+  let vocabMastered = 0;
+  for (const r of vocabRows) {
+    const e = byLesson.get(r.lesson_id) ?? { deck: 0, mastered: 0 };
+    e.deck += 1;
+    if (r.status === 'mastered') {
+      e.mastered += 1;
+      vocabMastered += 1;
+    }
+    byLesson.set(r.lesson_id, e);
+  }
+
+  const units: UnitStat[] = UNITS.map((u) => {
+    let lessonsDone = 0;
+    let vocabTotal = 0;
+    let vocabInDeck = 0;
+    let unitMastered = 0;
+    let accSum = 0;
+    let accN = 0;
+    for (const l of u.lessons) {
+      const st = progressByLesson.get(l.id);
+      if (st?.status === 'completed') lessonsDone += 1;
+      if (st && st.attempts > 0) {
+        accSum += st.bestAccuracy;
+        accN += 1;
+      }
+      vocabTotal += l.vocab.filter((v) => !v.noQuiz).length;
+      const agg = byLesson.get(l.id);
+      vocabInDeck += agg?.deck ?? 0;
+      unitMastered += agg?.mastered ?? 0;
+    }
+    return {
+      unitId: u.id,
+      title: u.title,
+      lessonsDone,
+      lessonsTotal: u.lessons.length,
+      vocabInDeck,
+      vocabMastered: unitMastered,
+      vocabTotal,
+      bestAvgAccuracy: accN ? accSum / accN : 0,
+    };
+  });
+
+  const xpRows = db
+    .prepare(
+      `SELECT date(created_at) AS d, SUM(xp_earned) AS xp
+       FROM quiz_attempts
+       GROUP BY d
+       ORDER BY d DESC
+       LIMIT 14`,
+    )
+    .all() as { d: string; xp: number }[];
+  const xpMap = new Map(xpRows.map((r) => [r.d, r.xp]));
+  const xpByDay: DayXp[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = addDays(todayStr(), -i);
+    xpByDay.push({ date: d, xp: xpMap.get(d) ?? 0 });
+  }
+
+  const totals = db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(correct),0) AS c, COALESCE(SUM(total),0) AS t
+       FROM quiz_attempts`,
+    )
+    .get() as { n: number; c: number; t: number };
+
+  const writing = db
+    .prepare(
+      `SELECT COUNT(*) AS g, COALESCE(SUM(count),0) AS c FROM writing_practice`,
+    )
+    .get() as { g: number; c: number };
+
+  const weakRows = [...vocabRows]
+    .filter((r) => r.status !== 'mastered')
+    .sort((a, b) => b.lapses - a.lapses || a.ease - b.ease || a.reps - b.reps)
+    .slice(0, 8);
+  const weakest: WeakWord[] = weakRows.flatMap((r) => {
+    const ref = VOCAB_INDEX.get(r.vocab_key);
+    if (!ref) return [];
+    return [
+      {
+        key: r.vocab_key,
+        kana: ref.item.kana,
+        romaji: ref.item.romaji,
+        meaning: ref.item.meaning,
+        lapses: r.lapses,
+        ease: r.ease,
+        lessonTitle: ref.lesson.title,
+      },
+    ];
+  });
+
+  return {
+    xp,
+    streak,
+    lessonsCompleted: states.filter((s) => s.status === 'completed').length,
+    lessonsTotal: LESSONS.length,
+    vocabInDeck: vocabRows.length,
+    vocabMastered,
+    vocabTotal: units.reduce((s, u) => s + u.vocabTotal, 0),
+    dueToday: getDueCount(),
+    quizAttempts: totals.n,
+    avgAccuracy: totals.t ? totals.c / totals.t : 0,
+    writingGlyphs: writing.g,
+    writingStrokes: writing.c,
+    xpByDay,
+    units,
+    weakest,
+  };
+}
+
 export { UNITS, LESSONS, UNIT_INDEX, LESSON_INDEX, lessonXp };
 export type { Lesson, Unit, VocabItem };
