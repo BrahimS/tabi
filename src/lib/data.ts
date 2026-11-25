@@ -166,6 +166,7 @@ export interface ReviewCard {
   meaning: string;
   tag?: string;
   note?: string;
+  alt?: string[];
   example?: { kana: string; romaji: string; meaning: string };
 }
 
@@ -183,6 +184,7 @@ export function rowToReviewCard(row: VocabStateRow): ReviewCard | null {
     meaning: ref.item.meaning,
     tag: ref.item.tag,
     note: ref.item.note,
+    alt: ref.item.alt,
     example: ref.item.example,
   };
 }
