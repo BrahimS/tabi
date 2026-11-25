@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
 import { getDueCount } from '@/lib/data';
-import { IconBook, IconPen, IconRefresh, IconUser, IconVideo } from '@/components/icons';
+import { IconBook, IconChart, IconPen, IconRefresh, IconUser, IconVideo } from '@/components/icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +71,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     {due > 99 ? '99+' : due}
                   </span>
                 )}
+              </Link>
+              <Link
+                href="/stats"
+                className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-ink-soft transition hover:bg-cream hover:text-ink"
+              >
+                <IconChart width={18} height={18} />
+                <span className="hidden sm:inline">Stats</span>
               </Link>
               <Link
                 href="/profile"

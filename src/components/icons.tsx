@@ -177,3 +177,12 @@ export function IconMic(p: P) {
     </svg>
   );
 }
+
+export function IconChart(p: P) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3 3v18h18" />
+      <path d="M8 15v-5m5 5V7m5 8v-3" />
+    </svg>
+  );
+}
