@@ -17,6 +17,25 @@ npm run build    # production build
 Progress is stored in `data/japan.db` (created on first run, gitignored).
 Override with `TABI_DB_DIR` / `TABI_DB_PATH` if needed.
 
+## Deploy to Railway
+
+Railway runs a persistent container, so the built-in `node:sqlite` works as-is —
+**no Turso needed** if you attach a Volume.
+
+1. Push this repo to GitHub (already done — `BrahimS/tabi`).
+2. railway.com → New Project → **Deploy from GitHub repo** → pick `tabi`.
+   Nixpacks auto-detects Next.js; `railway.toml` pins `npm start`.
+3. **Persistence:** in the service → Volumes → **Add Volume** → mount at `/data`.
+   `RAILWAY_VOLUME_MOUNT_PATH` is picked up automatically — no env vars needed.
+   Without a volume the app still runs, but the database is ephemeral and
+   resets on every redeploy.
+4. Settings → Networking → **Generate Domain** to get a public URL.
+5. (Optional) prefer Turso instead of a volume? Set `TURSO_DATABASE_URL` +
+   `TURSO_AUTH_TOKEN` as service variables and skip step 3 — the libsql
+   replica backend engages automatically.
+
+Node ≥ 22.13 is required (`node:sqlite`); pinned via `engines` + `.nvmrc`.
+
 ## Deploy to Vercel
 
 The local SQLite **file will not persist** on Vercel (serverless filesystem is
