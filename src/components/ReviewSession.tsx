@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { submitReview } from '@/lib/actions';
 import { primeSpeech } from '@/lib/speak';
 import { SpeakButton } from './SpeakButton';
+import { SayButton } from './SayButton';
 import { ProgressBar } from './ProgressBar';
 import { IconArrowRight, IconCheck, IconRefresh } from './icons';
 
@@ -19,6 +20,7 @@ export interface ReviewCardData {
   meaning: string;
   tag?: string;
   note?: string;
+  alt?: string[];
   example?: { kana: string; romaji: string; meaning: string };
 }
 
@@ -185,6 +187,7 @@ export function ReviewSession({
             )}
             <div className="mt-4 flex items-center justify-center gap-2">
               <SpeakButton text={card.kana} label="Listen" />
+              <SayButton kana={card.kana} romaji={card.romaji} alt={card.alt} />
             </div>
           </div>
         )}

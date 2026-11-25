@@ -11,6 +11,7 @@ import { VideoCard } from './VideoCard';
 import type { VideoItem } from '@/lib/videos';
 import { primeSpeech, speakJapanese } from '@/lib/speak';
 import { SpeakButton } from './SpeakButton';
+import { SayButton } from './SayButton';
 import { ProgressBar } from './ProgressBar';
 import {
   IconArrowLeft,
@@ -397,6 +398,7 @@ function LearnView({
 
         <div className="mt-6 flex items-center justify-center gap-3">
           <SpeakButton text={card.kana} label="Hear it" className="px-4 py-2" />
+          <SayButton kana={card.kana} romaji={card.romaji} alt={card.alt} label="Say it" />
           <button onClick={onNext} className="btn-primary px-6 py-2.5">
             {isLast ? (
               <>
