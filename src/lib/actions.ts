@@ -320,3 +320,19 @@ export async function importBackup(json: string): Promise<ActionResult> {
   if (res.ok) touchActivity();
   return res;
 }
+
+/** Persist a finished trip-mode round for stats. */
+export async function logTripSession(
+  scenario: TripScenario,
+  durationS: number,
+  score: number,
+  answered: number,
+): Promise<ActionResult> {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO trip_sessions (scenario, duration_s, score, answered)
+     VALUES (?, ?, ?, ?)`,
+  ).run(String(scenario), Math.max(0, durationS | 0), Math.max(0, score | 0), Math.max(0, answered | 0));
+  touchActivity();
+  return { ok: true };
+}

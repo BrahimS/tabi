@@ -115,8 +115,8 @@ export default function StatsPage() {
         </div>
       </section>
 
-      {/* weakest words + writing */}
-      <div className="grid gap-6 sm:grid-cols-2">
+      {/* weakest words + writing + play stats */}
+      <div className="grid gap-6 sm:grid-cols-3">
         <section className="card p-5">
           <h2 className="text-sm font-bold uppercase tracking-wide text-ink-soft">
             Trickiest words
@@ -165,6 +165,38 @@ export default function StatsPage() {
           >
             Open the writing pad →
           </Link>
+        </section>
+
+        <section className="card p-5">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide text-ink-soft">
+            <IconZap width={14} height={14} /> Play modes
+          </h2>
+          <div className="mt-3 space-y-3">
+            <div>
+              <p className="text-2xl font-extrabold">
+                {s.dialoguesPlayed}
+                <span className="ml-1 text-sm font-semibold text-ink-soft">
+                  {s.dialoguesPlayed === 1 ? 'scene played' : 'scenes played'}
+                </span>
+              </p>
+              <p className="text-xs text-ink-soft">+{s.dialogueXp} XP from dialogues</p>
+            </div>
+            <div className="border-t border-line pt-3">
+              <p className="text-2xl font-extrabold">
+                {s.tripSessions}
+                <span className="ml-1 text-sm font-semibold text-ink-soft">
+                  {s.tripSessions === 1 ? 'trip session' : 'trip sessions'}
+                </span>
+              </p>
+              <p className="text-xs text-ink-soft">
+                best score {s.tripBestScore} · {s.tripTotalAnswered} total answers
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex gap-3 text-xs font-bold text-vermilion">
+            <Link href="/dialogues" className="hover:underline">Scenes →</Link>
+            <Link href="/trip" className="hover:underline">Trip mode →</Link>
+          </div>
         </section>
       </div>
     </div>

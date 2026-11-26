@@ -82,6 +82,15 @@ CREATE TABLE IF NOT EXISTS dialogue_progress (
   last_played TEXT
 );
 
+CREATE TABLE IF NOT EXISTS trip_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scenario TEXT NOT NULL,
+  duration_s INTEGER NOT NULL,
+  score INTEGER NOT NULL,
+  answered INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_vocab_due ON vocab_state(due_date);
 CREATE INDEX IF NOT EXISTS idx_attempts_created ON quiz_attempts(created_at);
 `;
