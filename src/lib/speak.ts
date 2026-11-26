@@ -3,22 +3,21 @@
 let primed = false;
 // Chrome can garbage-collect an in-flight utterance; keep a live reference.
 let liveUtterance: SpeechSynthesisUtterance | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function primeSpeech() {
   if (typeof window === 'undefined' || primed) return;
   primed = true;
   try {
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.getVoices();
+      const synth = window.speechSynthesis;
+      synth.getVoices();
+      // Voice list loads async — keep it warm.
+      synth.onvoiceschanged = () => synth.getVoices();
     }
   } catch {
     // speech not available — ignore
   }
-}
-
-function japaneseVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
-  const ja = synth.getVoices().filter((v) => v.lang.toLowerCase().startsWith('ja'));
-  return ja[0] ?? null;
 }
 
 export function speakJapanese(text: string, rate = 0.85) {
@@ -32,11 +31,22 @@ export function speakJapanese(text: string, rate = 0.85) {
   u.lang = 'ja-JP';
   u.rate = rate;
   u.pitch = 1;
-  const voice = japaneseVoice(synth);
-  if (voice) u.voice = voice;
+  // Deliberately no explicit u.voice — Chrome picks a working ja-JP voice
+  // itself; forcing a specific system voice can silently drop the utterance.
   liveUtterance = u;
-  u.onend = u.onerror = () => {
+
+  let retried = false;
+  u.onend = () => {
     if (liveUtterance === u) liveUtterance = null;
+  };
+  u.onerror = (e) => {
+    if (liveUtterance === u) liveUtterance = null;
+    // 'interrupted'/'audio-busy' means Chrome dropped it — retry once cleanly.
+    if (!retried && (e.error === 'interrupted' || e.error === 'audio-busy')) {
+      retried = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => speakJapanese(text, rate), 250);
+    }
   };
   synth.speak(u);
   // Chrome/macOS auto-pauses the synth after ~15s idle — nudge it awake.
