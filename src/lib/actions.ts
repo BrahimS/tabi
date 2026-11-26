@@ -153,11 +153,12 @@ export async function updateProfile(input: {
   display_name?: string;
   level?: string;
   goal?: string;
+  daily_goal_xp?: number;
   motivation?: string;
 }): Promise<ActionResult> {
   const db = getDb();
   const fields: string[] = [];
-  const params: string[] = [];
+  const params: (string | number)[] = [];
 
   if (input.display_name !== undefined) {
     fields.push('display_name = ?');
@@ -170,6 +171,14 @@ export async function updateProfile(input: {
   if (input.goal !== undefined && GOALS.includes(input.goal)) {
     fields.push('goal = ?');
     params.push(input.goal);
+  }
+  if (input.daily_goal_xp !== undefined) {
+    const g = Math.round(Number(input.daily_goal_xp));
+    if (!Number.isFinite(g) || g < 5 || g > 500) {
+      return { ok: false, error: 'Daily goal must be 5–500 XP' };
+    }
+    fields.push('daily_goal_xp = ?');
+    params.push(g);
   }
   if (input.motivation !== undefined) {
     fields.push('motivation = ?');
