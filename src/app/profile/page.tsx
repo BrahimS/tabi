@@ -80,6 +80,7 @@ export default function ProfilePage() {
           display_name: profile.display_name,
           level: profile.level,
           goal: profile.goal,
+          daily_goal_xp: profile.daily_goal_xp,
           motivation: profile.motivation,
         }}
       />

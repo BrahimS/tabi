@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS profile (
   display_name TEXT NOT NULL DEFAULT '',
   level TEXT NOT NULL DEFAULT 'complete_beginner',
   goal TEXT NOT NULL DEFAULT 'travel_japan',
+  daily_goal_xp INTEGER NOT NULL DEFAULT 25,
   motivation TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -81,6 +82,12 @@ CREATE TABLE IF NOT EXISTS dialogue_progress (
   best_xp INTEGER NOT NULL DEFAULT 0,
   best_mistakes INTEGER,
   last_played TEXT
+);
+
+CREATE TABLE IF NOT EXISTS xp_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  amount INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS trip_sessions (
@@ -265,6 +272,7 @@ function migrate(db: Db) {
     }
   };
   addCol('dialogue_progress', 'best_mistakes', 'best_mistakes INTEGER');
+  addCol('profile', 'daily_goal_xp', 'daily_goal_xp INTEGER NOT NULL DEFAULT 25');
 }
 
 function ensureProfile(db: Db) {

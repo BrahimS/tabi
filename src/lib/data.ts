@@ -32,6 +32,7 @@ export interface Profile {
   display_name: string;
   level: string;
   goal: string;
+  daily_goal_xp: number;
   motivation: string;
   created_at: string;
 }
@@ -44,6 +45,7 @@ export function getProfile(): Profile {
       display_name: '',
       level: 'complete_beginner',
       goal: 'travel_japan',
+      daily_goal_xp: 25,
       motivation: '',
       created_at: '',
     }
@@ -87,6 +89,16 @@ export function touchActivity(): void {
 export function addXp(amount: number): void {
   const db = getDb();
   db.prepare('UPDATE user_state SET xp = xp + ? WHERE id = 1').run(amount);
+  db.prepare('INSERT INTO xp_events (amount) VALUES (?)').run(amount);
+}
+
+/** XP earned today, across every source (lessons, review, dialogues, trip). */
+export function getTodayXp(): number {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT COALESCE(SUM(amount),0) AS x FROM xp_events WHERE date(created_at) = date('now')")
+    .get() as { x: number };
+  return row.x;
 }
 
 // ---------- lesson progress ----------
@@ -309,6 +321,7 @@ export interface DashboardData {
   nextLesson: { lesson: Lesson; unit: Unit } | null;
   currentLesson: { lesson: Lesson; unit: Unit } | null;
   recentAttempts: (AttemptRow & { lessonTitle: string })[];
+  todayXp: number;
 }
 
 export function getDashboardData(): DashboardData {
@@ -370,6 +383,7 @@ export function getDashboardData(): DashboardData {
     nextLesson,
     currentLesson,
     recentAttempts,
+    todayXp: getTodayXp(),
   };
 }
 
@@ -689,9 +703,10 @@ const BACKUP_TABLES: Record<string, string[]> = {
   writing_practice: ['glyph', 'count', 'correct', 'last_practiced'],
   dialogue_progress: ['scene_id', 'completions', 'best_xp', 'best_mistakes', 'last_played'],
   trip_sessions: ['id', 'scenario', 'duration_s', 'score', 'answered', 'created_at'],
+  xp_events: ['id', 'amount', 'created_at'],
 };
 
-const PROFILE_COLS = ['display_name', 'level', 'goal', 'motivation'];
+const PROFILE_COLS = ['display_name', 'level', 'goal', 'daily_goal_xp', 'motivation'];
 const USER_STATE_COLS = ['xp', 'streak', 'last_active_date'];
 
 export interface ProgressBackup {

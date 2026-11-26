@@ -30,6 +30,28 @@ const GOAL_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+function GoalRing({ value, goal }: { value: number; goal: number }) {
+  const pct = Math.min(1, goal > 0 ? value / goal : 0);
+  const r = 15;
+  const circ = 2 * Math.PI * r;
+  return (
+    <svg width={40} height={40} viewBox="0 0 40 40" className="-rotate-90">
+      <circle cx={20} cy={20} r={r} fill="none" strokeWidth={5} className="stroke-line" />
+      <circle
+        cx={20}
+        cy={20}
+        r={r}
+        fill="none"
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={circ * (1 - pct)}
+        className="stroke-vermilion transition-all"
+      />
+    </svg>
+  );
+}
+
 function StatCard({
   icon,
   label,
@@ -59,7 +81,8 @@ function StatCard({
 
 export default async function DashboardPage() {
   const d = getDashboardData();
-  const { profile, state, stats, nextLesson, currentLesson, recentAttempts } = d;
+  const { profile, state, stats, nextLesson, currentLesson, recentAttempts, todayXp } = d;
+  const dailyGoal = Math.max(1, profile.daily_goal_xp || 25);
   const name = profile.display_name?.trim();
   const hour = new Date().getHours();
   const greeting = hour < 11 ? 'おはよう' : hour < 18 ? 'こんにちは' : 'こんばんは';
@@ -111,7 +134,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* stats */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
           icon={<IconZap width={20} height={20} className="text-gold" />}
           label="day streak"
@@ -143,6 +166,13 @@ export default async function DashboardPage() {
           label="reviews due"
           value={String(stats.dueReviews)}
           accent="bg-matcha/10"
+        />
+        <StatCard
+          icon={<GoalRing value={todayXp} goal={dailyGoal} />}
+          label="today's goal"
+          value={`${todayXp}/${dailyGoal} XP`}
+          sub={todayXp >= dailyGoal ? 'goal reached!' : `${dailyGoal - todayXp} to go`}
+          accent="bg-vermilion/10"
         />
       </section>
 

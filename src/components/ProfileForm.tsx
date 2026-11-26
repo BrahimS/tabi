@@ -23,11 +23,12 @@ const GOALS = [
 export function ProfileForm({
   initial,
 }: {
-  initial: { display_name: string; level: string; goal: string; motivation: string };
+  initial: { display_name: string; level: string; goal: string; daily_goal_xp?: number; motivation: string };
 }) {
   const [name, setName] = useState(initial.display_name);
   const [level, setLevel] = useState(initial.level);
   const [goal, setGoal] = useState(initial.goal);
+  const [dailyGoal, setDailyGoal] = useState(String(initial.daily_goal_xp ?? 25));
   const [motivation, setMotivation] = useState(initial.motivation);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(false);
@@ -42,6 +43,7 @@ export function ProfileForm({
         display_name: name,
         level,
         goal,
+        daily_goal_xp: Number(dailyGoal),
         motivation,
       });
       if (res.ok) {
@@ -109,6 +111,23 @@ export function ProfileForm({
               ))}
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-bold" htmlFor="pf-daily-goal">
+            Daily XP goal
+          </label>
+          <input
+            id="pf-daily-goal"
+            type="number"
+            min={5}
+            max={500}
+            step={5}
+            value={dailyGoal}
+            onChange={(e) => setDailyGoal(e.target.value)}
+            className="w-full rounded-xl border border-line bg-white px-4 py-2.5 outline-none transition focus:border-vermilion sm:w-48"
+          />
+          <p className="mt-1 text-xs text-ink-soft">Shown as a progress ring on your dashboard.</p>
         </div>
 
         <div>
