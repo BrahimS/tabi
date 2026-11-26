@@ -161,17 +161,42 @@ function libsqlBackend(): Db {
   // Push local writes to Turso shortly after the last one lands.
   let dirty = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  const doSync = () => {
+    dirty = false;
+    raw.sync().catch((e: unknown) => console.error('[tabi] Turso sync failed:', e));
+  };
   const scheduleSync = () => {
     dirty = true;
     if (timer) return;
     timer = setTimeout(() => {
       timer = null;
       if (!dirty) return;
-      dirty = false;
-      raw.sync().catch((e: unknown) => console.error('[tabi] Turso sync failed:', e));
+      doSync();
     }, 2000);
     timer.unref?.();
   };
+
+  // Flush pending writes on shutdown so the last write isn't lost when a
+  // deploy terminates the process inside the 2s debounce window.
+  const flush = (): Promise<void> => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (!dirty) return Promise.resolve();
+    dirty = false;
+    return Promise.resolve(raw.sync()).then(
+      () => undefined,
+      (e: unknown) => console.error('[tabi] Turso sync failed:', e),
+    );
+  };
+  const flushThenExit = () => {
+    // Give the push max 1.5s, then exit — a handler must not block shutdown.
+    Promise.race([flush(), new Promise((r) => setTimeout(r, 1500))]).finally(() =>
+      process.exit(0),
+    );
+  };
+  process.once('SIGTERM', flushThenExit);
+  process.once('SIGINT', flushThenExit);
+  process.on('beforeExit', () => void flush());
 
   return {
     prepare(sql: string): DbStatement {
