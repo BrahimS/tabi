@@ -670,7 +670,7 @@ const BACKUP_TABLES: Record<string, string[]> = {
   ],
   quiz_attempts: ['id', 'lesson_id', 'correct', 'total', 'xp_earned', 'created_at'],
   writing_practice: ['glyph', 'count', 'correct', 'last_practiced'],
-  dialogue_progress: ['scene_id', 'completions', 'best_xp', 'last_played'],
+  dialogue_progress: ['scene_id', 'completions', 'best_xp', 'best_mistakes', 'last_played'],
   trip_sessions: ['id', 'scenario', 'duration_s', 'score', 'answered', 'created_at'],
 };
 

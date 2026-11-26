@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS dialogue_progress (
   scene_id TEXT PRIMARY KEY,
   completions INTEGER NOT NULL DEFAULT 0,
   best_xp INTEGER NOT NULL DEFAULT 0,
+  best_mistakes INTEGER,
   last_played TEXT
 );
 
@@ -248,10 +249,22 @@ export function getDb(): Db {
       db = nodeBackend();
     }
     db.exec(SCHEMA);
+    migrate(db);
     ensureProfile(db);
     ensureUserState(db);
   }
   return db;
+}
+
+/** Additive column migrations for DBs created before a column existed. */
+function migrate(db: Db) {
+  const addCol = (table: string, col: string, ddl: string) => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === col)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+    }
+  };
+  addCol('dialogue_progress', 'best_mistakes', 'best_mistakes INTEGER');
 }
 
 function ensureProfile(db: Db) {

@@ -206,6 +206,11 @@ export function DialoguePlayer({
           </p>
           <p className="mt-1 text-sm text-ink-soft">
             {mistakes === 0 ? 'Perfect run — not a single misstep!' : `${mistakes} ${mistakes === 1 ? 'mistake' : 'mistakes'} — replay for a clean run.`}
+            {xpEarned === 0 && (
+              <span className="mt-1 block text-xs">
+                No XP this time — you already matched your best run. Fewer mistakes earns the difference.
+              </span>
+            )}
           </p>
           <div className="mt-4 flex justify-center gap-3">
             <button onClick={restart} className="btn-secondary">
