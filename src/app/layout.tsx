@@ -1,15 +1,20 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import './globals.css';
 import { getDueCount } from '@/lib/data';
 import { IconBook, IconChart, IconChat, IconPen, IconRefresh, IconUser, IconVideo, IconZap } from '@/components/icons';
+import { ServiceWorkerReg } from '@/components/ServiceWorkerReg';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Tabi — Learn Japanese for Travel',
   description: 'A Japanese learning app for travelers: hiragana, katakana, survival phrases, and a spaced-repetition deck.',
+  appleWebApp: { capable: true, title: 'Tabi', statusBarStyle: 'default' },
+  icons: { apple: '/icons/apple-touch-icon.png' },
 };
+
+export const viewport: Viewport = { themeColor: '#c2402a' };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const due = await getDueCount();
@@ -111,6 +116,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Tabi · Learn Japanese for your trip · 旅を楽しんで
           </p>
         </footer>
+
+        <ServiceWorkerReg />
       </body>
     </html>
   );
