@@ -280,27 +280,51 @@ export async function fetchTripDeck(scenario: TripScenario): Promise<TripItem[]>
 }
 
 /** Award XP for finishing a dialogue scene; wrong picks cost 2 XP each (floor 3). */
+/**
+ * Award XP for finishing a dialogue scene.
+ * First completion earns the full run XP; replays only earn the delta when
+ * beating your previous best (no farming the same scene).
+ */
 export async function completeDialogue(
   sceneId: string,
   mistakes: number,
-): Promise<ActionResult & { xp?: number }> {
+): Promise<ActionResult & { xp?: number; improved?: boolean }> {
   const scene = DIALOGUE_INDEX.get(sceneId);
   if (!scene) return { ok: false, error: 'Unknown scene' };
 
-  const xp = Math.max(3, scene.xp - Math.max(0, mistakes) * 2);
+  const m = Math.max(0, Math.floor(mistakes));
+  const runXp = Math.max(3, scene.xp - m * 2);
+
   const db = getDb();
+  const prev = db
+    .prepare('SELECT best_xp, best_mistakes FROM dialogue_progress WHERE scene_id = ?')
+    .get(sceneId) as { best_xp: number; best_mistakes: number | null } | undefined;
+
+  let earned = 0;
+  let improved = false;
+  if (!prev) {
+    earned = runXp;
+    improved = true;
+  } else if (prev.best_mistakes === null || m < prev.best_mistakes) {
+    // Beat your best — earn the XP difference between runs.
+    const prevRunXp = Math.max(3, scene.xp - (prev.best_mistakes ?? 99) * 2);
+    earned = Math.max(0, runXp - prevRunXp);
+    improved = true;
+  }
+
   db.prepare(
-    `INSERT INTO dialogue_progress (scene_id, completions, best_xp, last_played)
-     VALUES (?, 1, ?, datetime('now'))
+    `INSERT INTO dialogue_progress (scene_id, completions, best_xp, best_mistakes, last_played)
+     VALUES (?, 1, ?, ?, datetime('now'))
      ON CONFLICT(scene_id) DO UPDATE SET
        completions = completions + 1,
        best_xp = MAX(best_xp, excluded.best_xp),
+       best_mistakes = MIN(COALESCE(best_mistakes, 999), excluded.best_mistakes),
        last_played = datetime('now')`,
-  ).run(sceneId, xp);
+  ).run(sceneId, runXp, m);
 
   touchActivity();
-  addXp(xp);
-  return { ok: true, xp };
+  if (earned > 0) addXp(earned);
+  return { ok: true, xp: earned, improved };
 }
 
 /** Serialize all progress to a JSON backup string. */
