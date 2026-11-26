@@ -212,6 +212,23 @@ export function getDueCount(): number {
   return row.c;
 }
 
+/**
+ * Non-mastered cards ordered by weakness (lapses, then low ease, then fewest
+ * reps) — regardless of due date — for the weak-spots drill.
+ */
+export function getWeakSpotCards(limit = 15): ReviewCard[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT * FROM vocab_state
+       WHERE status != 'mastered'
+       ORDER BY lapses DESC, ease ASC, reps ASC
+       LIMIT ?`,
+    )
+    .all(limit) as unknown as VocabStateRow[];
+  return rows.map(rowToReviewCard).filter((c): c is ReviewCard => c !== null);
+}
+
 export function getVocabState(vocabKeyStr: string): VocabStateRow | undefined {
   const db = getDb();
   return db.prepare('SELECT * FROM vocab_state WHERE vocab_key = ?').get(vocabKeyStr) as
