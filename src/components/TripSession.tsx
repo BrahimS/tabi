@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchTripDeck } from '@/lib/actions';
+import { fetchTripDeck, logTripSession } from '@/lib/actions';
 import {
   TRIP_SCENARIOS,
   type TripItem,
@@ -87,6 +87,7 @@ export function TripSession() {
           deck={phase.deck}
           kanaMode={phase.kanaMode}
           duration={duration}
+          scenario={scenario}
           onDone={(score, answered, missed) => setPhase({ kind: 'done', score, answered, missed })}
         />
       )}
@@ -169,11 +170,13 @@ function PlayView({
   deck,
   kanaMode,
   duration,
+  scenario,
   onDone,
 }: {
   deck: TripItem[];
   kanaMode: boolean;
   duration: number;
+  scenario: TripScenario;
   onDone: (score: number, answered: number, missed: TripItem[]) => void;
 }) {
   const [q, setQ] = useState<Question>(() => makeQuestion(deck[0], deck, kanaMode));
@@ -191,8 +194,9 @@ function PlayView({
   const finish = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
+    logTripSession(scenario, duration, scoreRef.current, answeredRef.current);
     onDone(scoreRef.current, answeredRef.current, missedRef.current);
-  }, [onDone]);
+  }, [onDone, scenario, duration]);
 
   useEffect(() => {
     const t = setInterval(() => {

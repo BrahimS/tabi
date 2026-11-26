@@ -451,6 +451,11 @@ export interface Stats {
   avgAccuracy: number;
   writingGlyphs: number;
   writingStrokes: number;
+  dialoguesPlayed: number;
+  dialogueXp: number;
+  tripSessions: number;
+  tripBestScore: number;
+  tripTotalAnswered: number;
   xpByDay: DayXp[];
   units: UnitStat[];
   weakest: WeakWord[];
@@ -547,6 +552,21 @@ export function getStats(): Stats {
     )
     .get() as { g: number; c: number };
 
+  const dialogueAgg = db
+    .prepare(
+      `SELECT COALESCE(SUM(completions),0) AS plays, COALESCE(SUM(best_xp),0) AS xp
+       FROM dialogue_progress`,
+    )
+    .get() as { plays: number; xp: number };
+
+  const trip = db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(MAX(score),0) AS best,
+              COALESCE(SUM(answered),0) AS answered
+       FROM trip_sessions`,
+    )
+    .get() as { n: number; best: number; answered: number };
+
   const weakRows = [...vocabRows]
     .filter((r) => r.status !== 'mastered')
     .sort((a, b) => b.lapses - a.lapses || a.ease - b.ease || a.reps - b.reps)
@@ -580,6 +600,11 @@ export function getStats(): Stats {
     avgAccuracy: totals.t ? totals.c / totals.t : 0,
     writingGlyphs: writing.g,
     writingStrokes: writing.c,
+    dialoguesPlayed: dialogueAgg.plays,
+    dialogueXp: dialogueAgg.xp,
+    tripSessions: trip.n,
+    tripBestScore: trip.best,
+    tripTotalAnswered: trip.answered,
     xpByDay,
     units,
     weakest,
@@ -646,6 +671,7 @@ const BACKUP_TABLES: Record<string, string[]> = {
   quiz_attempts: ['id', 'lesson_id', 'correct', 'total', 'xp_earned', 'created_at'],
   writing_practice: ['glyph', 'count', 'correct', 'last_practiced'],
   dialogue_progress: ['scene_id', 'completions', 'best_xp', 'last_played'],
+  trip_sessions: ['id', 'scenario', 'duration_s', 'score', 'answered', 'created_at'],
 };
 
 const PROFILE_COLS = ['display_name', 'level', 'goal', 'motivation'];
