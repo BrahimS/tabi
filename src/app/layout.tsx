@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import './globals.css';
 import { getDueCount } from '@/lib/data';
-import { IconBook, IconChart, IconChat, IconPen, IconRefresh, IconUser, IconVideo, IconZap } from '@/components/icons';
+import { IconBook, IconChart, IconChat, IconList, IconPen, IconRefresh, IconUser, IconVideo, IconZap } from '@/components/icons';
 import { ServiceWorkerReg } from '@/components/ServiceWorkerReg';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +90,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               >
                 <IconZap width={18} height={18} />
                 <span className="hidden sm:inline">Trip</span>
+              </Link>
+              <Link
+                href="/phrases"
+                className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-ink-soft transition hover:bg-cream hover:text-ink"
+              >
+                <IconList width={18} height={18} />
+                <span className="hidden sm:inline">Phrases</span>
               </Link>
               <Link
                 href="/stats"
