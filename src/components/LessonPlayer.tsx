@@ -18,6 +18,7 @@ import {
   IconArrowRight,
   IconCheck,
   IconPlay,
+  IconRefresh,
   IconStar,
   IconVolume,
 } from './icons';
@@ -46,6 +47,10 @@ export function LessonPlayer({
   const [phase, setPhase] = useState<Phase>(initialPhase);
   const [cardIdx, setCardIdx] = useState(0);
   const [qIdx, setQIdx] = useState(0);
+  const [quizSet, setQuizSet] = useState<QuizQuestion[]>(questions);
+  const [round, setRound] = useState(1);
+  const [missedIdx, setMissedIdx] = useState<number[]>([]);
+  const [retryCorrect, setRetryCorrect] = useState<number | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [typeVal, setTypeVal] = useState('');
   const [answered, setAnswered] = useState<boolean | null>(null);
@@ -58,9 +63,9 @@ export function LessonPlayer({
 
   const vocab = lesson.vocab;
   const card = vocab[cardIdx];
-  const q = questions[qIdx];
+  const q = quizSet[qIdx];
   const isLastCard = cardIdx === vocab.length - 1;
-  const isLastQuestion = qIdx === questions.length - 1;
+  const isLastQuestion = qIdx === quizSet.length - 1;
 
   useEffect(() => {
     primeSpeech();
@@ -142,20 +147,37 @@ export function LessonPlayer({
     setAnswered(null);
   }
 
+  function recordAnswer(ok: boolean) {
+    setAnswered(ok);
+    if (round === 1) {
+      if (ok) setCorrectCount((c) => c + 1);
+      else setMissedIdx((m) => (m.includes(qIdx) ? m : [...m, qIdx]));
+    } else if (ok) {
+      setRetryCorrect((c) => (c ?? 0) + 1);
+    }
+  }
+
   function pickChoice(optId: string) {
     if (answered !== null || !q?.choices) return;
     setPicked(optId);
     const opt = q.choices.find((o) => o.id === optId);
-    const ok = !!opt?.correct;
-    setAnswered(ok);
-    if (ok) setCorrectCount((c) => c + 1);
+    recordAnswer(!!opt?.correct);
   }
 
   function submitType() {
     if (answered !== null || !q?.accept || !typeVal.trim()) return;
-    const ok = checkRomajiAnswer(typeVal, q.accept);
-    setAnswered(ok);
-    if (ok) setCorrectCount((c) => c + 1);
+    recordAnswer(checkRomajiAnswer(typeVal, q.accept));
+  }
+
+  function startRetry() {
+    const missed = questions.filter((_, i) => missedIdx.includes(i));
+    if (missed.length === 0) return;
+    setQuizSet(missed);
+    setQIdx(0);
+    setRound(2);
+    setRetryCorrect(0);
+    resetQuestion();
+    setPhase('quiz');
   }
 
   function nextQuestion() {
@@ -211,7 +233,7 @@ export function LessonPlayer({
         <QuizView
           q={q}
           idx={qIdx}
-          total={questions.length}
+          total={quizSet.length}
           picked={picked}
           typeVal={typeVal}
           answered={answered}
@@ -232,6 +254,9 @@ export function LessonPlayer({
           xpEarned={xpEarned}
           saveError={saveError}
           nextLesson={nextLesson}
+          missed={missedIdx.length}
+          retryCorrect={retryCorrect}
+          onRetry={startRetry}
         />
       )}
     </div>
@@ -622,6 +647,9 @@ function DoneView({
   xpEarned,
   saveError,
   nextLesson,
+  missed,
+  retryCorrect,
+  onRetry,
 }: {
   lesson: Lesson;
   accuracy: number;
@@ -630,6 +658,9 @@ function DoneView({
   xpEarned: number | null;
   saveError: boolean;
   nextLesson: { id: string; title: string; unitTitle: string } | null;
+  missed: number;
+  retryCorrect: number | null;
+  onRetry: () => void;
 }) {
   const router = useRouter();
   return (
@@ -662,6 +693,12 @@ function DoneView({
       <p className="mt-4 text-sm text-ink-soft">
         {lesson.vocab.length} words & characters added to your review deck.
       </p>
+      {retryCorrect !== null && (
+        <p className="mt-2 text-sm font-semibold text-matcha">
+          Retry round: {retryCorrect}/{missed} correct
+          {retryCorrect === missed ? ' — cleaned them all up!' : ''}
+        </p>
+      )}
       {saveError && (
         <p className="mt-2 text-sm font-semibold text-vermilion">
           Progress could not be saved — check your connection and refresh.
@@ -669,6 +706,12 @@ function DoneView({
       )}
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        {missed > 0 && retryCorrect === null && (
+          <button type="button" onClick={onRetry} className="btn-primary px-6 py-2.5">
+            Retry {missed} missed {missed === 1 ? 'question' : 'questions'}
+            <IconRefresh width={16} height={16} />
+          </button>
+        )}
         <Link href="/review" className="btn-primary px-6 py-2.5" onClick={() => router.refresh()}>
           Review words
           <IconArrowRight width={16} height={16} />
