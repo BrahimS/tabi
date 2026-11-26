@@ -5,6 +5,7 @@ import type { DialogueChoice, DialogueScene } from '@/lib/dialogues';
 import { completeDialogue } from '@/lib/actions';
 import { IconCheck, IconArrowRight, IconArrowLeft, IconRefresh } from './icons';
 import { SpeakButton } from './SpeakButton';
+import { SayButton } from './SayButton';
 
 interface Bubble {
   speaker: 'them' | 'you' | 'narrator' | 'system';
@@ -168,6 +169,16 @@ export function DialoguePlayer({
                   >
                     {b.meaning}
                   </p>
+                )}
+                {you && !b.wrong && b.kana && (
+                  <div className="mt-1.5">
+                    <SayButton
+                      kana={b.kana}
+                      romaji={b.romaji ?? ''}
+                      label="Say it"
+                      className="!border-transparent !bg-white/25 !text-white !px-2 !py-1 hover:!bg-white/40"
+                    />
+                  </div>
                 )}
                 {!you && b.kana && (
                   <div className="mt-1.5">
