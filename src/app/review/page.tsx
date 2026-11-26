@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { getDueVocab, getDueCount } from '@/lib/data';
-import { ReviewSession } from '@/components/ReviewSession';
+import { getDueVocab, getDueCount, getWeakSpotCards } from '@/lib/data';
+import { ReviewHub } from '@/components/ReviewHub';
 import { IconBook } from '@/components/icons';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 export default function ReviewPage() {
   const total = getDueCount();
   const cards = getDueVocab(40);
+  const weak = getWeakSpotCards(15);
   const remaining = Math.max(0, total - cards.length);
 
   return (
@@ -19,7 +20,7 @@ export default function ReviewPage() {
         </p>
       </div>
 
-      {cards.length === 0 ? (
+      {cards.length === 0 && weak.length === 0 ? (
         <div className="card mx-auto max-w-lg p-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-matcha/15 text-matcha">
             <IconBook width={28} height={28} />
@@ -34,14 +35,7 @@ export default function ReviewPage() {
           </Link>
         </div>
       ) : (
-        <>
-          {remaining > 0 && (
-            <p className="text-center text-sm text-ink-soft">
-              Showing {cards.length} of {total} due words — the rest will follow in the next session.
-            </p>
-          )}
-          <ReviewSession cards={cards} remaining={remaining} />
-        </>
+        <ReviewHub dueCards={cards} weakCards={weak} remaining={remaining} />
       )}
     </div>
   );
