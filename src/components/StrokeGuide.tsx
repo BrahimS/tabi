@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { STROKE_PATHS } from '@/lib/strokes';
 
-/**
- * Stroke-order overlay for kana. KanjiVG centerlines on a 109×109 canvas,
- * revealed one stroke at a time on mount; remount (via key) to replay.
- */
-export function StrokeGuide({ glyph }: { glyph: string }) {
-  const paths = STROKE_PATHS[glyph];
+/** True when every character of the glyph has stroke data. */
+export function hasStrokeData(glyph: string): boolean {
+  return [...glyph].every((c) => c in STROKE_PATHS);
+}
+
+function GlyphStrokes({ char }: { char: string }) {
+  const paths = STROKE_PATHS[char];
   const [shown, setShown] = useState(0);
 
   useEffect(() => {
@@ -24,11 +25,7 @@ export function StrokeGuide({ glyph }: { glyph: string }) {
 
   const visible = paths.slice(0, shown);
   return (
-    <svg
-      className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox="0 0 109 109"
-      aria-hidden
-    >
+    <svg viewBox="0 0 109 109" className="h-full w-full" aria-hidden>
       {visible.map((s, i) => (
         <path
           key={i}
@@ -58,5 +55,29 @@ export function StrokeGuide({ glyph }: { glyph: string }) {
         </g>
       ))}
     </svg>
+  );
+}
+
+/**
+ * Stroke-order overlay. KanjiVG centerlines on a 109×109 canvas, revealed one
+ * stroke at a time on mount; remount (via key) to replay. Multi-char glyphs
+ * render one canvas per character, animating side by side.
+ */
+export function StrokeGuide({ glyph }: { glyph: string }) {
+  const chars = [...glyph];
+  if (!hasStrokeData(glyph)) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      {chars.map((c, i) => (
+        <div
+          key={`${c}-${i}`}
+          className="aspect-square"
+          style={{ width: `${100 / chars.length}%` }}
+        >
+          <GlyphStrokes char={c} />
+        </div>
+      ))}
+    </div>
   );
 }
