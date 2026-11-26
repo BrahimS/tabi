@@ -80,7 +80,21 @@ export function SayButton({
     }
   }
 
-  if (supported === false) return null;
+  if (supported === false) {
+    // Speech recognition is Chrome/Edge-only — show a disabled state so the
+    // feature isn't invisible, rather than rendering nothing.
+    return (
+      <button
+        type="button"
+        disabled
+        title="Speech practice needs Chrome or Edge (ja-JP speech recognition)"
+        className={`inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-sm font-semibold text-ink-soft opacity-50 cursor-not-allowed ${className}`}
+      >
+        <IconMic width={16} height={16} />
+        {label}
+      </button>
+    );
+  }
   if (supported === null) {
     // Avoid layout jump: reserve an invisible button while detecting.
     return <span className={`inline-block h-[34px] w-24 ${className}`} />;
