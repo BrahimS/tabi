@@ -2,6 +2,8 @@
 // Chrome/Edge ship webkitSpeechRecognition with ja-JP; Safari/Firefox don't,
 // so callers must feature-detect with speechRecognitionSupported().
 
+import { UNITS } from './content';
+
 export interface SpeechResult {
   transcript: string;
   confidence: number;
@@ -246,11 +248,68 @@ export interface SayScore {
   expected: string;
 }
 
+// ---------- kanji → reading substitution ----------
+// ASR often returns kanji (魚) when the speaker said the reading (さかな).
+// Build readings from the curriculum itself: any vocab item whose display
+// form contains kanji contributes "kanji form" → reading.
+
+const KANJI_RE = /[\u4e00-\u9fff]/;
+const WORD_READINGS: Record<string, string> = {};
+for (const u of UNITS) {
+  for (const l of u.lessons) {
+    for (const it of l.vocab) {
+      if (!KANJI_RE.test(it.kana)) continue;
+      const reading = romajiToKana(it.romaji);
+      if (reading) WORD_READINGS[it.kana] = reading;
+    }
+  }
+}
+// Longest keys first so compounds (出口) beat single chars (出) when both exist.
+const WORD_KEYS = Object.keys(WORD_READINGS).sort((a, b) => b.length - a.length);
+
+/** Variants of the transcript with kanji replaced by their readings. */
+export function kanjiVariants(heard: string): string[] {
+  if (!KANJI_RE.test(heard)) return [];
+  let v = heard;
+  for (const k of WORD_KEYS) {
+    if (v.includes(k)) v = v.split(k).join(WORD_READINGS[k]);
+  }
+  return v === heard ? [] : [v];
+}
+
 /**
  * Score a speech transcript against a vocab item.
  * Candidates: the item's kana as-is (covers kanji items where ASR returns the
  * kanji) plus every accepted romaji form converted to kana.
  */
+function scoreVariant(
+  heard: string,
+  candidates: Set<string>,
+): { verdict: SayVerdict; expected: string } {
+  let bestExpected = '';
+  let bestDist = Infinity;
+  let matched = false;
+  for (const c of candidates) {
+    if (heard === c) return { verdict: 'exact', expected: c };
+    if (heard && c && (heard.includes(c) || c.includes(heard))) {
+      const shorter = Math.min(heard.length, c.length);
+      const longer = Math.max(heard.length, c.length);
+      if (shorter / longer >= 0.6) matched = true;
+    }
+    const d = editDistance(heard, c);
+    if (d < bestDist) {
+      bestDist = d;
+      bestExpected = c;
+    }
+  }
+  if (matched) return { verdict: 'close', expected: bestExpected };
+  const rel = heard.length ? bestDist / Math.max(heard.length, bestExpected.length, 1) : 1;
+  return {
+    verdict: rel <= 0.25 && bestDist <= 2 ? 'close' : 'miss',
+    expected: bestExpected,
+  };
+}
+
 export function scoreSpeech(
   transcript: string,
   item: { kana: string; romaji: string; alt?: string[] }
@@ -264,29 +323,16 @@ export function scoreSpeech(
     if (kk) candidates.add(kk);
   }
 
-  let bestExpected = item.kana;
-  let bestDist = Infinity;
-  let matched = false;
-  for (const c of candidates) {
-    if (heard === c) {
-      return { verdict: 'exact', heard, expected: c };
+  // Score the raw transcript plus kanji→reading variants; best wins.
+  const variants = [heard, ...kanjiVariants(heard)];
+  const rank: Record<SayVerdict, number> = { exact: 2, close: 1, miss: 0 };
+  let best: SayScore = { verdict: 'miss', heard, expected: item.kana };
+  for (const v of variants) {
+    const s = scoreVariant(v, candidates);
+    if (rank[s.verdict] > rank[best.verdict]) {
+      best = { verdict: s.verdict, heard, expected: s.expected };
     }
-    if (heard && c && (heard.includes(c) || c.includes(heard))) {
-      const shorter = Math.min(heard.length, c.length);
-      const longer = Math.max(heard.length, c.length);
-      if (shorter / longer >= 0.6) matched = true;
-    }
-    const d = editDistance(heard, c);
-    if (d < bestDist) {
-      bestDist = d;
-      bestExpected = c;
-    }
+    if (s.verdict === 'exact') break;
   }
-  if (matched) return { verdict: 'close', heard, expected: bestExpected };
-  const rel = heard.length ? bestDist / Math.max(heard.length, bestExpected.length, 1) : 1;
-  return {
-    verdict: rel <= 0.25 && bestDist <= 2 ? 'close' : 'miss',
-    heard,
-    expected: bestExpected,
-  };
+  return best;
 }

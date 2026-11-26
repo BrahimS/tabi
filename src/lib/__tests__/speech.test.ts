@@ -40,15 +40,18 @@ describe('scoreSpeech', () => {
   it('exact match on kana transcript', () => {
     expect(scoreSpeech('さかな', item).verdict).toBe('exact');
   });
-  it('kanji transcript for a kana-only item misses (no reading dictionary)', () => {
-    // The UI shows "heard: 魚" so the user can self-verify — designed fallback.
+  it('kanji transcript resolves via curriculum reading map', () => {
+    // 魚 is a curriculum kanji (unit7) with reading さかな — variant scores exact.
     const r = scoreSpeech('魚', item);
-    expect(r.verdict).toBe('miss');
+    expect(r.verdict).toBe('exact');
     expect(r.heard).toBe('魚');
   });
   it('kanji items match when ASR returns the same kanji', () => {
     const kanjiItem = { kana: '魚', romaji: 'sakana' };
     expect(scoreSpeech('魚', kanjiItem).verdict).toBe('exact');
+  });
+  it('unknown kanji still misses', () => {
+    expect(scoreSpeech('龘', item).verdict).toBe('miss');
   });
   it('katakana transcript matches hiragana target', () => {
     expect(scoreSpeech('サカナ', item).verdict).toBe('exact');
