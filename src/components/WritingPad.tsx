@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { logWritingPractice, recognizeInk } from '@/lib/actions';
 import { SpeakButton } from './SpeakButton';
-import { StrokeGuide } from './StrokeGuide';
-import { STROKE_PATHS } from '@/lib/strokes';
+import { StrokeGuide, hasStrokeData } from './StrokeGuide';
 import { IconArrowRight, IconCheck, IconRefresh, IconStar } from './icons';
 import type { WritingDeck, WritingItem } from '@/lib/data';
 
@@ -259,7 +258,7 @@ export function WritingPad({ deck }: { deck: WritingDeck }) {
   const glyphLen = [...item.glyph].length;
   const ghostSize = Math.min(170, Math.round(300 / Math.max(1.4, glyphLen * 0.9)));
   const recognized = candidates !== null && candidates.includes(item.glyph);
-  const hasStrokes = item.glyph in STROKE_PATHS;
+  const hasStrokes = hasStrokeData(item.glyph);
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
